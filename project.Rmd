@@ -1,0 +1,143 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "Dmitri Perov"
+date: "January 28, 2016"
+output: html_document
+---
+#Summary
+
+The goal of this project is to create prediction model for "classe" variable in the training set.
+
+The dataset first was preprocessed and only meanful feature remains there.
+Two model were tested - decision tree (RPART) and Random Forest.
+
+Decision tree model showed low accuracy and would not provide good results with testing dataset.
+
+Accuracy of Random Forest model is much higher. This model used to predict the testing dataset and gave 100% accuracy. 
+
+
+#Data preprocessing
+
+It is assumed that original dataset is already downloaded into current directory.
+Current directory should contain files **pml-testing.csv** and **pml-training.csv**.
+
+Loading required libraries
+```{r}
+load(".RData")
+library(ggplot2)
+library(caret)
+```
+
+Loading original training dataset
+```{r cache=TRUE}
+data <- read.csv("pml-training.csv", dec = ".")
+# some columns contain number in parent
+# remove row 5373, which contains outliner
+data <- data[-5373,]
+```
+
+Check how many NAs contains each of the variables (column)
+```{r }
+calc_na <- function(name, dataset) sum(is.na(dataset[,name]))
+na_count <- data.frame(name=names(data), na=sapply(names(data), calc_na, dataset=data))
+na_cols <- na_count[na_count$na > 0,]$name
+na_col_count <- length(na_cols)
+
+```
+
+We have `r na_col_count` which contains NA. 
+Our decision is to get rid of such column
+Also, columns 1-7 contains timestaps, ids and they are not needed for model training.
+
+```{r }
+data_subset <- data[, !names(data) %in% na_cols]
+data_subset <- data_subset[-c(1:7)]
+```
+ 
+ Also, we removing column which are stored in dataset as strings.
+```{r }
+col_type_names <- sapply(data_subset, typeof)
+character_cols <- col_type_names == "character"
+length(character_cols)
+data_subset <- data_subset[, !character_cols]
+```
+
+Then we visually inspect all the remaining variables in dateset.
+
+The following code is flagged not evaluated because it produces a very large number of plots.
+```{r, eval= FALSE}
+for (col_name in names(data_subset)) {
+  print(qplot(data_subset[,col_name], 1:nrow(data_subset),      colour=data$classe)+xlab(col_name));
+}
+```
+
+Instead, some of the variables are plotted for example to show how it looks like.
+
+For example appearance of variables 
+"min_yaw_belt", "magnet_forearm_z", "gyros_belt_y"
+is shown on the following plots. 
+
+Compare the appearance of first plot (looks like random data) with the second and third
+```{r, eval= TRUE}
+for (col_name in c("min_yaw_belt", "magnet_forearm_z", "gyros_belt_y")) {
+  print(qplot(data_subset[,col_name], 1:nrow(data_subset),      colour=data$classe)+xlab(col_name));
+}
+```
+
+Visual inspection of data revealed that vaiables whose name looks like
+
+* min*
+* max*
+* kurtosis*
+* skewness*
+* amplitude*
+
+are not correlated with classe variable
+
+We are removing all them from the dataset
+
+```{r}
+misc_cols <- grep("^(min|max|kurtosis|skewness|amplitude)", names(data_subset))
+data_subset <- data_subset[, -misc_cols]
+misc_cols_removed <- length(misc_cols)
+misc_cols_removed
+```
+ 
+
+Data set contains now `r ncol(data_subset)` columns and it seems to be clean enouph to proceed with model training.
+ 
+#Model training
+
+First, try to implement some simple model, say decision tree and check what would be the accuracy.
+
+```{r eval = FALSE}
+model_rpart <- train(classe ~ ., data = data_subset, method = "rpart")
+```
+
+
+The next model we're going to test will be Random Forest
+Model creatation is VERY time consuming process. 
+Expect couple of hours of execution.
+
+```{r eval = FALSE}
+model_rf <- train(classe ~ ., data = data_subset3, method = "rf")
+```
+
+Random Forest model provides much more accuracy.
+
+```{r}
+model$results$Accuracy
+```
+
+#Model testing
+
+Loading testing dataset and applying Random Forest model on it
+
+```{r}
+testing <- read.csv("pml-testing.csv", dec = ".")
+predict(model, testing)
+```
+ 
+These results are the keys for the Course last Quiz.
+Applying these reveal that the results are 100% accurate.
+
